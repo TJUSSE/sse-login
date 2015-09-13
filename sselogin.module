@@ -4,7 +4,6 @@ error_reporting(E_ALL);
 ini_set('display_errors', TRUE);
 ini_set('display_startup_errors', TRUE);
 
-define('BASE_URL', 'http://ssedev.tongji.edu.cn');
 define('SSO_SERVICE', 'http://127.0.0.1:20212');
 
 function sselogin_help($path, $arg) {
@@ -18,6 +17,7 @@ function sselogin_help($path, $arg) {
 function sselogin_menu() {
     $items = array();
 
+    //登录接口
     $items['sselogin/login'] = array(
         'title' => '登录',
         'page callback' => '_sselogin_login',
@@ -25,8 +25,32 @@ function sselogin_menu() {
         'type' => MENU_NORMAL_ITEM,
     );
 
+    //设置菜单
+    $items['admin/config/content/sselogin'] = array(
+        'title' => '设置教师白名单',
+        'description' => 'Configuration for sse_subscription module',
+        'page callback' => 'drupal_get_form',
+        'page arguments' => array('sselogin_config_form'),
+        'access arguments' => array('access administration pages'),
+        'type' => MENU_NORMAL_ITEM,
+    );
+
+
     return $items;
 }
+
+//设置菜单
+function sselogin_config_form($form, $form_state) {
+    $form['teacher'] = array(
+        '#type' => 'textarea',
+        '#title' => t('教师白名单'),
+        '#default_value' => variable_get('teacher', ''),
+        '#required' => TRUE,
+    );
+
+    return system_settings_form($form);
+}
+
 
 function _sselogin_login() {
     //这里只处理成功的情况
@@ -61,15 +85,43 @@ function _sselogin_login() {
         return;
     }
 
-    var_dump($userId);
-    var_dump($userName);
+    //var_dump($userId);
+    //var_dump($userName);
 
     //验证白名单
+    $whiteList = explode("\n", variable_get('teacher', ''));
+    $whiteList = array_map("trim", $whiteList);
+    //var_dump(trim($whiteList[0]));
+    //var_dump($whiteList);
+    if (!in_array($userId, $whiteList, TRUE)) {
+        var_dump("该用户没有权限");
+        return;
+    }
 
-    //不存在账户则登录
+    //不存在账户则创建账户
+    $userName = 'faculty_'.$userId;
+    $user_obj = user_load_by_name($userName);
+    if (!$user_obj) {
+        $new_user = array(
+            'name' => 'faculty_'.$userId,
+            'mail' => '505968815@qq.com',
+            'pass' => user_password(8),
+            'status' => 1,
+            'init' => '505968815@qq.com',
+            'roles' => array(
+                DRUPAL_AUTHENTICATED_RID => 'authenticated user',
+            )
+        );
+        $user_obj = user_save('', $new_user);
+        //var_dump('create success!');
+
+    }
 
     //直接登录
-
+    //var_dump($user_obj);
+    $login_array = array('name' => 'root');
+    user_login_finalize($login_array);
+    //user_login_submit(array(), $form_state);
 
     //drupal_goto("http://www.baidu.com");
 }
