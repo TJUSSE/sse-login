@@ -1,0 +1,4 @@
+name = SSE Login
+description = sse login module
+core = 7.x
+package = SSE
