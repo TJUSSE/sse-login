@@ -4,7 +4,9 @@ error_reporting(E_ALL);
 ini_set('display_errors', TRUE);
 ini_set('display_startup_errors', TRUE);
 
-define('SSO_SERVICE', 'http://127.0.0.1:20212');
+if (!defined('SSO_SERVICE')) define('SSO_SERVICE', 'http://localhost:20212');
+if (!defined('BASE_URL')) define('BASE_URL', 'http://ssedev.tongji.edu.cn');
+if (!defined('ADMIN_EMAIL')) define('ADMIN_EMAIL', 'admin@tongji.edu.cn');
 
 function sselogin_help($path, $arg) {
     switch ($path) {
@@ -104,27 +106,22 @@ function _sselogin_login() {
     if (!$user_obj) {
         $new_user = array(
             'name' => 'faculty_'.$userId,
-            'mail' => '505968815@qq.com',
+            'mail' => constant('ADMIN_EMAIL'),
             'pass' => user_password(8),
             'status' => 1,
-            'init' => '505968815@qq.com',
+            'init' => constant('ADMIN_EMAIL'),
             'roles' => array(
                 DRUPAL_AUTHENTICATED_RID => 'authenticated user',
                 3 => '开发者'
             )
         );
         $user_obj = user_save('', $new_user);
-        //var_dump('create success!');
-
     }
 
     //直接登录
-    //var_dump($user_obj);
-    //$login_array = array('name' => $user_obj->uid);
     $form_state = array();
     $form_state['uid'] = $user_obj->uid;
     user_login_submit(array(), $form_state);
-    //var_dump("Login Success!");
 
-    drupal_goto("http://ssedev.tongji.edu.cn/zh/admin/dashboard");
+    drupal_goto(constant('BASE_URL'));
 }
