@@ -110,6 +110,7 @@ function _sselogin_login() {
             'init' => '505968815@qq.com',
             'roles' => array(
                 DRUPAL_AUTHENTICATED_RID => 'authenticated user',
+                3 => '开发者'
             )
         );
         $user_obj = user_save('', $new_user);
@@ -119,9 +120,11 @@ function _sselogin_login() {
 
     //直接登录
     //var_dump($user_obj);
-    $login_array = array('name' => 'root');
-    user_login_finalize($login_array);
-    //user_login_submit(array(), $form_state);
+    //$login_array = array('name' => $user_obj->uid);
+    $form_state = array();
+    $form_state['uid'] = $user_obj->uid;
+    user_login_submit(array(), $form_state);
+    //var_dump("Login Success!");
 
-    //drupal_goto("http://www.baidu.com");
+    drupal_goto("http://ssedev.tongji.edu.cn/zh/admin/dashboard");
 }
