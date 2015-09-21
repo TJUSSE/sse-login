@@ -28,8 +28,8 @@ function sselogin_menu() {
     );
 
     //设置菜单
-    $items['admin/config/content/sselogin'] = array(
-        'title' => '设置教师白名单',
+    $items['admin/config/services/sselogin'] = array(
+        'title' => '设置教师登录白名单',
         'description' => 'Configuration for sse_subscription module',
         'page callback' => 'drupal_get_form',
         'page arguments' => array('sselogin_config_form'),
@@ -123,5 +123,6 @@ function _sselogin_login() {
     $form_state['uid'] = $user_obj->uid;
     user_login_submit(array(), $form_state);
 
-    drupal_goto(constant('BASE_URL'));
+    drupal_goto('<front>');
+    //drupal_goto(constant('BASE_URL'));
 }

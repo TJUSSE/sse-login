@@ -1,5 +1,6 @@
 name = SSE Login
 description = sse login module
+version = 7.x-0.1
 core = 7.x
 package = SSE
-configure = admin/config/content/sselogin
+configure = admin/config/services/sselogin
