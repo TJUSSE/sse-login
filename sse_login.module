@@ -168,7 +168,7 @@ function sse_login_login_callback() {
   }
 
   $obj = json_decode($res->body, true);
-  if (!isset($obj['ok']) || $obj['ok'] !== true) {
+  if (!isset($obj['ok']) || !$obj['ok']) {
     sse_login_error_and_redirect(t('统一验证会话已失效，请重新登录。'));
     sse_login_delete_sso_tokens();
     return;
@@ -198,14 +198,14 @@ function sse_login_login_callback() {
   
   // 用户不存在，先检查姓名是否匹配，再创建用户
   if (!$drupal_user) {
-    $res = Requests::get(constant('SSO_SERVICE').'/info/student?sessionid='.urlencode($sso_token));
+    $res = Requests::get(constant('SSO_SERVICE').'/info/teacher?sessionid='.urlencode($sso_token));
     if (!$res->success) {
       sse_login_error_and_redirect(t('统一验证服务暂不可用，请联系管理员。'));
       return;
     }
 
     $obj = json_decode($res->body, true);
-    if (!isset($obj['ok']) || !isset($obj['info']['name']) || !$obj['info']['name']) {
+    if (!isset($obj['ok']) || !$obj['ok'] || !isset($obj['info']['name']) || !$obj['info']['name']) {
       sse_login_error_and_redirect(t('统一验证服务无法获取用户姓名，请联系管理员。'));
       return;
     }
