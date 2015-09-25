@@ -2,7 +2,7 @@
 
 require_once __DIR__ . '/vendor/autoload.php';
 
-if (!defined('SSO_SERVICE')) define('SSO_SERVICE', 'http://127.0.0.1:20212');
+const SSE_LOGIN_DEFAULT_SSO_SERVICE_URL = 'http://127.0.0.1:20212';
 
 /**
  * implement hook_menu()
@@ -16,7 +16,7 @@ function sse_login_menu() {
     'access callback' => TRUE,
     'type' => MENU_CALLBACK,
   );
-  //设置菜单
+  //配置
   $items['admin/config/services/sse_login'] = array(
     'title' => '同济大学账户登录',
     'description' => '配置同济大学统一登录',
@@ -74,6 +74,14 @@ function _sse_login_teacher_process_to_text($list_array) {
  */
 function _sse_login_config_form($form, &$form_state) {
   $def_value = _sse_login_teacher_process_to_text(variable_get('sse_login_teacher', []));
+  $form['sse_login_sso_url'] = array(
+    '#type' => 'textfield',
+    '#title' => t('单点验证服务地址'),
+    '#description' => t('指定验证服务地址，请勿随意修改。默认值：' . SSE_LOGIN_DEFAULT_SSO_SERVICE_URL),
+    '#default_value' => variable_get('sse_login_sso_url'),
+    '#size' => 50,
+    '#required' => TRUE,
+  );
   $form['sse_login_teacher'] = array(
     '#type' => 'textarea',
     '#title' => t('可登录教师名单'),
@@ -165,10 +173,11 @@ function _sse_login_login_callback() {
   $faculty_id = null;
   $faculty_name = null;
 
+  $sso_service_url = variable_get('sse_login_sso_url');
   $valid_user_list = variable_get('sse_login_teacher', []);
 
   // 首先验证 Session 的合法性
-  $res = Requests::get(constant('SSO_SERVICE').'/session/properties?sessionid=' . urlencode($sso_token));
+  $res = Requests::get($sso_service_url.'/session/properties?sessionid=' . urlencode($sso_token));
   if (!$res->success) {
     _sse_login_error_and_redirect(t('统一验证服务暂不可用，请联系管理员。'));
     return;
@@ -205,7 +214,7 @@ function _sse_login_login_callback() {
   
   // 用户不存在，先检查姓名是否匹配，再创建用户
   if (!$drupal_user) {
-    $res = Requests::get(constant('SSO_SERVICE').'/info/teacher?sessionid='.urlencode($sso_token));
+    $res = Requests::get($sso_service_url.'/info/teacher?sessionid='.urlencode($sso_token));
     if (!$res->success) {
       _sse_login_error_and_redirect(t('统一验证服务暂不可用，请联系管理员。'));
       return;

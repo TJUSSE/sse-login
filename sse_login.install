@@ -1,0 +1,10 @@
+<?php
+
+/**
+ * implement hook_enable
+ */
+function sse_login_enable() {
+  if (variable_get('sse_login_sso_url') === null) {
+    variable_set('sse_login_sso_url', SSE_LOGIN_DEFAULT_SSO_SERVICE_URL);
+  }
+}
