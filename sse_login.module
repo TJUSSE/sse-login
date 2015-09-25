@@ -4,39 +4,45 @@ require_once __DIR__ . '/vendor/autoload.php';
 
 if (!defined('SSO_SERVICE')) define('SSO_SERVICE', 'http://127.0.0.1:20212');
 
-function sse_login_help($path, $arg) {
-  switch ($path) {
-    case 'admin/help#sse_login':
-      return '<p>'.t('同济大学软件学院教师登录模块，使用前请先配置可登录账户');
-      break;
-  }
-}
-
+/**
+ * implement hook_menu()
+ */
 function sse_login_menu() {
   $items = [];
   //登录接口
   $items['sse_login/login'] = array(
     'title' => '登录',
-    'page callback' => 'sse_login_login_callback',
+    'page callback' => '_sse_login_login_callback',
     'access callback' => TRUE,
-    'type' => MENU_NORMAL_ITEM,
+    'type' => MENU_CALLBACK,
   );
   //设置菜单
   $items['admin/config/services/sse_login'] = array(
     'title' => '同济大学账户登录',
     'description' => '配置同济大学统一登录',
     'page callback' => 'drupal_get_form',
-    'page arguments' => array('sse_login_config_form'),
-    'access arguments' => array('access administration pages'),
+    'page arguments' => array('_sse_login_config_form'),
+    'access arguments' => array('administer sse_login'),
     'type' => MENU_NORMAL_ITEM,
   );
   return $items;
 }
 
 /**
+ * implement hook_permission()
+ */
+function sse_login_permission() {
+  return array(
+    'administer sse_login' => array(
+      'title' => t('管理 SSE 统一登录模块')
+    )
+  );
+}
+
+/**
  * 接受用户输入的教师名单，处理成可解析的数组
  */
-function sse_login_teacher_process_to_array($user_input) {
+function _sse_login_teacher_process_to_array($user_input) {
   $valid_list = [];
   $arr = explode("\n", $user_input);
   foreach ($arr as $line) {
@@ -55,7 +61,7 @@ function sse_login_teacher_process_to_array($user_input) {
 /**
  * 接受可解析数组，转换成用户输入格式的教师名单
  */
-function sse_login_teacher_process_to_text($list_array) {
+function _sse_login_teacher_process_to_text($list_array) {
   $ret = '';
   foreach ($list_array as $teacher) {
     $ret .= $teacher['id'].'|'.$teacher['name']."\n";
@@ -66,38 +72,39 @@ function sse_login_teacher_process_to_text($list_array) {
 /**
  * 创建配置表单
  */
-function sse_login_config_form($form, &$form_state) {
-  $def_value = sse_login_teacher_process_to_text(variable_get('sse_login_teacher', []));
+function _sse_login_config_form($form, &$form_state) {
+  $def_value = _sse_login_teacher_process_to_text(variable_get('sse_login_teacher', []));
   $form['sse_login_teacher'] = array(
     '#type' => 'textarea',
     '#title' => t('可登录教师名单'),
+    '#rows' => 10,
     '#description' => t('一行一个，格式为：工号|姓名。只有符合工号和姓名的用户才允许登录到系统。'),
     '#default_value' => $def_value,
     '#required' => TRUE,
   );
   $form = system_settings_form($form);
-  $form['#submit'][] = 'sse_login_config_form_submit';
+  $form['#submit'][] = '_sse_login_config_form_submit';
   return $form;
 }
 
 /**
  * 处理配置表单
  */
-function sse_login_config_form_submit($form, &$form_state) {
-  variable_set('sse_login_teacher', sse_login_teacher_process_to_array($form_state['values']['sse_login_teacher']));
+function _sse_login_config_form_submit($form, &$form_state) {
+  variable_set('sse_login_teacher', _sse_login_teacher_process_to_array($form_state['values']['sse_login_teacher']));
 }
 
 /**
  * 构建登录用户名
  */
-function sse_login_build_username($faculty_id, $faculty_name) {
+function _sse_login_build_username($faculty_id, $faculty_name) {
   return 'faculty_' . $faculty_id . '_' . $faculty_name;
 }
 
 /**
  * 构建 Email
  */
-function sse_login_build_email($faculty_id) {
+function _sse_login_build_email($faculty_id) {
   return $faculty_id . '@tongji.edu.cn';
 }
 
@@ -109,7 +116,7 @@ function sse_login_build_email($faculty_id) {
 function sse_login_form_alter(&$form, &$form_state, $form_id) {
   if ($form['#id'] === 'user-login') {
     if (isset($_GET['sse_sso_fail'])) {
-      sse_login_error_and_redirect(t('统一验证用户名或密码错误。'));
+      _sse_login_error_and_redirect(t('统一验证用户名或密码错误。'));
       return;
     }
     $form['actions']['submit']['#value'] = '登录';
@@ -128,7 +135,7 @@ function sse_login_form_alter(&$form, &$form_state, $form_id) {
 /**
  * 输出错误信息并要求登录
  */
-function sse_login_error_and_redirect($message) {
+function _sse_login_error_and_redirect($message) {
   drupal_set_message($message, 'error');
   drupal_goto('user/login');
 }
@@ -136,7 +143,7 @@ function sse_login_error_and_redirect($message) {
 /**
  * 清除 iPlanetDirectoryPro
  */
-function sse_login_delete_sso_tokens() {
+function _sse_login_delete_sso_tokens() {
   if (!isset($_COOKIE['iPlanetDirectoryPro'])) {
     return;
   }
@@ -147,9 +154,9 @@ function sse_login_delete_sso_tokens() {
 /**
  * 发起登录的处理函数
  */
-function sse_login_login_callback() {
+function _sse_login_login_callback() {
   if (!isset($_COOKIE['iPlanetDirectoryPro'])) {
-    sse_login_error_and_redirect(t('无法获得会话参数，统一验证登录失败。'));
+    _sse_login_error_and_redirect(t('无法获得会话参数，统一验证登录失败。'));
     return;
   }
 
@@ -163,14 +170,14 @@ function sse_login_login_callback() {
   // 首先验证 Session 的合法性
   $res = Requests::get(constant('SSO_SERVICE').'/session/properties?sessionid=' . urlencode($sso_token));
   if (!$res->success) {
-    sse_login_error_and_redirect(t('统一验证服务暂不可用，请联系管理员。'));
+    _sse_login_error_and_redirect(t('统一验证服务暂不可用，请联系管理员。'));
     return;
   }
 
   $obj = json_decode($res->body, true);
   if (!isset($obj['ok']) || !$obj['ok']) {
-    sse_login_error_and_redirect(t('统一验证会话已失效，请重新登录。'));
-    sse_login_delete_sso_tokens();
+    _sse_login_error_and_redirect(t('统一验证会话已失效，请重新登录。'));
+    _sse_login_delete_sso_tokens();
     return;
   }
 
@@ -187,31 +194,31 @@ function sse_login_login_callback() {
   }
 
   if ($user_id_found === false) {
-    sse_login_error_and_redirect(t('该账户不可登录系统，请联系管理员进行配置。'));
+    _sse_login_error_and_redirect(t('该账户不可登录系统，请联系管理员进行配置。'));
     return;
   }
   
   // 检查用户是否已存在
-  $drupal_user_name = sse_login_build_username($faculty_id, $user_id_found['name']);
-  $drupal_user_email = sse_login_build_email($faculty_id);
+  $drupal_user_name = _sse_login_build_username($faculty_id, $user_id_found['name']);
+  $drupal_user_email = _sse_login_build_email($faculty_id);
   $drupal_user = user_load_by_name($drupal_user_name);
   
   // 用户不存在，先检查姓名是否匹配，再创建用户
   if (!$drupal_user) {
     $res = Requests::get(constant('SSO_SERVICE').'/info/teacher?sessionid='.urlencode($sso_token));
     if (!$res->success) {
-      sse_login_error_and_redirect(t('统一验证服务暂不可用，请联系管理员。'));
+      _sse_login_error_and_redirect(t('统一验证服务暂不可用，请联系管理员。'));
       return;
     }
 
     $obj = json_decode($res->body, true);
     if (!isset($obj['ok']) || !$obj['ok'] || !isset($obj['info']['name']) || !$obj['info']['name']) {
-      sse_login_error_and_redirect(t('统一验证服务无法获取用户姓名，请联系管理员。'));
+      _sse_login_error_and_redirect(t('统一验证服务无法获取用户姓名，请联系管理员。'));
       return;
     }
 
     if ($user_id_found['name'] !== $obj['info']['name']) {
-      sse_login_error_and_redirect(t('您的姓名与系统中登记的姓名不符合，请联系管理员核查。'));
+      _sse_login_error_and_redirect(t('您的姓名与系统中登记的姓名不符合，请联系管理员核查。'));
       return;
     }
 
