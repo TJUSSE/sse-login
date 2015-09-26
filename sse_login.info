@@ -3,4 +3,4 @@ description = Using Tongji University SSO service to log in.
 version = 7.x-0.1
 core = 7.x
 package = SSE
-configure = admin/config/services/sse_login
+configure = admin/config/services/sse_login/accounts

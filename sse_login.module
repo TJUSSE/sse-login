@@ -17,14 +17,23 @@ function sse_login_menu() {
     'type' => MENU_CALLBACK,
   );
   //配置
-  $items['admin/config/services/sse_login'] = array(
+  $items['admin/config/services/sse_login/accounts'] = array(
     'title' => '同济大学账户登录',
     'description' => '配置同济大学统一登录',
     'page callback' => 'drupal_get_form',
-    'page arguments' => array('_sse_login_config_form'),
+    'page arguments' => array('_sse_login_config_account_form'),
     'access arguments' => array('administer sse_login'),
     'type' => MENU_NORMAL_ITEM,
   );
+  $items['admin/config/services/sse_login/role'] = array(
+    'title' => '同济大学账户权限',
+    'description' => '配置同济大学统一登录所创建用户的权限',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('_sse_login_config_role_form'),
+    'access arguments' => array('administer permissions'),
+    'type' => MENU_NORMAL_ITEM,
+  );
+
   return $items;
 }
 
@@ -70,9 +79,9 @@ function _sse_login_teacher_process_to_text($list_array) {
 }
 
 /**
- * 创建配置表单
+ * 创建账户配置表单
  */
-function _sse_login_config_form($form, &$form_state) {
+function _sse_login_config_account_form($form, &$form_state) {
   $def_value = _sse_login_teacher_process_to_text(variable_get('sse_login_teacher', []));
   $form['sse_login_sso_url'] = array(
     '#type' => 'textfield',
@@ -91,15 +100,39 @@ function _sse_login_config_form($form, &$form_state) {
     '#required' => TRUE,
   );
   $form = system_settings_form($form);
-  $form['#submit'][] = '_sse_login_config_form_submit';
+  $form['#submit'][] = '_sse_login_config_account_form_submit';
   return $form;
 }
 
 /**
- * 处理配置表单
+ * 处理账户配置表单
  */
-function _sse_login_config_form_submit($form, &$form_state) {
+function _sse_login_config_account_form_submit($form, &$form_state) {
   variable_set('sse_login_teacher', _sse_login_teacher_process_to_array($form_state['values']['sse_login_teacher']));
+}
+
+/**
+ * 获得默认权限配置
+ */
+function _sse_login_get_role_config() {
+  return array_values(array_filter(variable_get('sse_login_role', [])));
+}
+
+/**
+ * 创建账户权限表单
+ */
+function _sse_login_config_role_form($form, &$form_state) {
+  $roles = user_roles(true);
+
+  $form['sse_login_role'] = [
+    '#type' => 'checkboxes',
+    '#title' => t('新账户角色'),
+    '#description' => t('配置由同济大学统一认证登录创建的新账户的权限。该设置不会改变已有账户的权限。'),
+    '#default_value' => _sse_login_get_role_config(),
+    '#options' => $roles,
+  ];
+  $form = system_settings_form($form);
+  return $form;
 }
 
 /**
@@ -231,6 +264,11 @@ function _sse_login_login_callback() {
       return;
     }
 
+    // 计算 roles
+    $config_roles = _sse_login_get_role_config();
+    $all_roles = user_roles(true);
+    $roles = array_intersect_key($all_roles, array_flip($config_roles));
+
     // 创建账户
     $new_user = [
       'name' => $drupal_user_name,
@@ -239,11 +277,7 @@ function _sse_login_login_callback() {
       'status' => 1,
       'language' => 'zh-hans',
       'init' => $drupal_user_email,
-      'roles' => [
-        DRUPAL_AUTHENTICATED_RID => 'authenticated user',
-        6 => '可访问后台',
-        9 => '教师信息管理'
-      ]
+      'roles' => $roles
     ];
     $drupal_user = user_save(null, $new_user);
   }
