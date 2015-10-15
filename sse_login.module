@@ -274,6 +274,7 @@ function _sse_login_login_callback() {
       'name' => $drupal_user_name,
       'mail' => $drupal_user_email,
       'pass' => user_password(16),
+      'timezone' => 'Asia/Shanghai',
       'status' => 1,
       'language' => 'zh-hans',
       'init' => $drupal_user_email,
@@ -287,4 +288,153 @@ function _sse_login_login_callback() {
   $form_state['uid'] = $drupal_user->uid;
   user_login_submit([], $form_state);
   drupal_goto('<front>');
+}
+
+/**
+ * 检查用户名是否需要拒绝
+ */
+function _sse_is_username_rejected($name) {
+  $name = trim($name);
+  return stripos($name, 'faculty_') === 0;
+}
+
+/**
+ * 模拟登录时「用户名或密码错误」错误
+ */
+function _sse_raise_login_form_error($name) {
+  form_set_error('name', t('Sorry, unrecognized username or password. <a href="@password">Have you forgotten your password?</a>', array('@password' => url('user/password', array('query' => array('name' => $name))))));
+}
+
+/**
+ * 模拟「用户名或邮箱不存在」错误
+ */
+function _sse_raise_pass_form_error($name) {
+  form_set_error('name', t('Sorry, %name is not recognized as a user name or an e-mail address.', array('%name' => $name)));
+}
+
+/**
+ * 模拟「昵称已被占用」错误
+ */
+function _sse_raise_reg_form_error($name) {
+  form_set_error('name', t('The name %name is already taken.', array('%name' => $name)));
+}
+
+/**
+ * Implements hook_form_FORM_ID_alter() for user_login().
+ */
+function sse_login_form_user_login_alter(&$form, &$form_state) {
+  $form['#validate'][] = '_sse_login_login_form_validate';
+}
+
+/**
+ * Implements hook_form_FORM_ID_alter() for user_login_block().
+ */
+function sse_login_form_user_login_block_alter(&$form, &$form_state) {
+  $form['#validate'][] = '_sse_login_login_form_validate';
+}
+
+/**
+ * Implements hook_form_FORM_ID_alter() for user_pass().
+ */
+function sse_login_form_user_pass_alter(&$form, &$form_state) {
+  $form['#validate'][] = '_sse_login_pass_form_validate';
+
+  global $user;
+  if ($user->uid > 0) {
+    if (_sse_is_username_rejected($user->name)) {
+      // 已登录情况下，不允许统一账户重设密码
+      // 假装这个页面不存在
+      drupal_not_found();
+      return;
+    }
+  }
+}
+
+/**
+ * Implements hook_form_FORM_ID_alter() for user_profile_form().
+ */
+function sse_login_form_user_profile_form_alter(&$form, &$form_state) {
+  $form['#validate'][] = '_sse_login_profile_form_validate';
+
+  $account = $form['#user'];
+  if ($account->name && _sse_is_username_rejected($account->name)) {
+    // 对于特殊用户，界面上禁止修改用户名
+    if (isset($form['account']['name'])) {
+      $form['account']['name']['#disabled'] = TRUE;
+      $form['account']['name']['#value'] = $account->name;
+    }
+    // 对于特殊用户，界面上禁止修改密码
+    if (isset($form['account']['pass'])) {
+      unset($form['account']['pass'], $form['account']['current_pass']);
+      $form['account']['current_pass_required_values']['#value'] = array();
+    }
+  }
+}
+
+/**
+ * Implements hook_form_FORM_ID_alter() for user_register_form().
+ */
+function sse_login_form_user_register_form_alter(&$form, &$form_state) {
+  $form['#validate'][] = '_sse_login_register_form_validate';
+}
+
+/**
+ * 登录时检查用户名，不允许开头是 faculty_ 的用户登录
+ */
+function _sse_login_login_form_validate($form, &$form_state) {
+  if (!empty($form_state['values']['name'])) {
+    if (_sse_is_username_rejected($form_state['values']['name'])) {
+      // 强行假装用户不存在
+      _sse_raise_login_form_error($form_state['values']['name']);
+      return;
+    }
+  }
+}
+
+/**
+ * 找回密码时检查用户名，不允许 faculty_ 开头的用户找回密码
+ */
+function _sse_login_pass_form_validate($form, &$form_state) {
+  $name = trim($form_state['values']['name']);
+  // 直接检查用户名
+  if (_sse_is_username_rejected($name)) {
+    _sse_raise_pass_form_error($name);
+    return;
+  }
+  // 电子邮件找回，也检查用户名
+  $users = user_load_multiple(array(), array('mail' => $name, 'status' => '1'));
+  $account = reset($users);
+  if ($account && _sse_is_username_rejected($account->name)) {
+    _sse_raise_pass_form_error($name);
+    return;
+  }
+}
+
+/**
+ * 个人资料页面，不允许其他用户修改为 faculty_ 开头的用户名；不允许 faculty_ 开头的用户修改用户名和密码
+ */
+function _sse_login_profile_form_validate($form, &$form_state) {
+  $account = $form_state['user'];
+  if (!_sse_is_username_rejected($account->name) && _sse_is_username_rejected($form_state['values']['name'])) {
+    _sse_raise_reg_form_error($form_state['values']['name']);
+    return;
+  }
+  // 确保统一账户的用户名和密码不被修改
+  if (_sse_is_username_rejected($account->name)) {
+    $form_state['values']['name'] = $acconut->name;
+    $form_state['values']['pass'] = '';
+    $form_state['values']['current_pass'] = '';
+    $form_state['values']['current_pass_required_values'] = [];
+    return;
+  }
+}
+
+/**
+ * 注册页面，不允许注册为 faculty_ 开头的用户名
+ */
+function _sse_login_register_form_validate($form, &$form_state) {
+  if (_sse_is_username_rejected($form_state['values']['name'])) {
+    _sse_raise_reg_form_error($form_state['values']['name']);
+    return;
+  }
 }
