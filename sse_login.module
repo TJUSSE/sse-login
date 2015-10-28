@@ -358,11 +358,6 @@ function sse_login_form_user_profile_form_alter(&$form, &$form_state) {
 
   $account = $form['#user'];
   if ($account->name && _sse_is_username_rejected($account->name)) {
-    // 对于特殊用户，界面上禁止修改用户名
-    if (isset($form['account']['name'])) {
-      $form['account']['name']['#disabled'] = TRUE;
-      $form['account']['name']['#value'] = $account->name;
-    }
     // 对于特殊用户，界面上禁止修改密码
     if (isset($form['account']['pass'])) {
       unset($form['account']['pass'], $form['account']['current_pass']);
@@ -420,7 +415,7 @@ function _sse_login_profile_form_validate($form, &$form_state) {
     return;
   }
   // 确保统一账户的用户名和密码不被修改
-  if (_sse_is_username_rejected($account->name)) {
+  if (isset($account->name) && _sse_is_username_rejected($account->name)) {
     $form_state['values']['name'] = $acconut->name;
     $form_state['values']['pass'] = '';
     $form_state['values']['current_pass'] = '';
