@@ -210,7 +210,13 @@ function _sse_login_login_callback() {
   $valid_user_list = variable_get('sse_login_teacher', []);
 
   // 首先验证 Session 的合法性
-  $res = Requests::get($sso_service_url.'/session/properties?sessionid=' . urlencode($sso_token));
+  try {
+    $res = Requests::get($sso_service_url.'/session/properties?sessionid=' . urlencode($sso_token));
+  } catch (\Exception $exception) {
+    _sse_login_error_and_redirect(t('统一验证服务暂不可用，请联系管理员。'));
+    return;
+  }
+
   if (!$res->success) {
     _sse_login_error_and_redirect(t('统一验证服务暂不可用，请联系管理员。'));
     return;
@@ -295,7 +301,7 @@ function _sse_login_login_callback() {
  */
 function _sse_is_username_rejected($name) {
   $name = trim($name);
-  return stripos($name, 'faculty_') === 0;
+  return mb_stripos($name, 'faculty_') === 0;
 }
 
 /**
@@ -358,6 +364,11 @@ function sse_login_form_user_profile_form_alter(&$form, &$form_state) {
 
   $account = $form['#user'];
   if ($account->name && _sse_is_username_rejected($account->name)) {
+    // 对于特殊用户，界面上禁止修改用户名
+    if (isset($form['account']['name'])) {
+      $form['account']['name']['#disabled'] = TRUE;
+      $form['account']['name']['#value'] = $account->name;
+    }
     // 对于特殊用户，界面上禁止修改密码
     if (isset($form['account']['pass'])) {
       unset($form['account']['pass'], $form['account']['current_pass']);
@@ -416,7 +427,7 @@ function _sse_login_profile_form_validate($form, &$form_state) {
   }
   // 确保统一账户的用户名和密码不被修改
   if (isset($account->name) && _sse_is_username_rejected($account->name)) {
-    $form_state['values']['name'] = $acconut->name;
+    $form_state['values']['name'] = $account->name;
     $form_state['values']['pass'] = '';
     $form_state['values']['current_pass'] = '';
     $form_state['values']['current_pass_required_values'] = [];
